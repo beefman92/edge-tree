@@ -10,11 +10,11 @@ import org.slf4j.LoggerFactory;
 
 import java.net.SocketAddress;
 
-public class ServerHandler extends ChannelInboundHandlerAdapter {
+public class DataHandler extends ChannelInboundHandlerAdapter {
     private Logger logger = LoggerFactory.getLogger(this.getClass());
     private MessagePool messagePool;
 
-    public ServerHandler(MessagePool messagePool) {
+    public DataHandler(MessagePool messagePool) {
         this.messagePool = messagePool;
     }
 
@@ -39,7 +39,7 @@ public class ServerHandler extends ChannelInboundHandlerAdapter {
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-        logger.warn("ServerHandler encounters exception. ", cause);
+        logger.warn("DataHandler encounters exception. ", cause);
         ctx.fireExceptionCaught(cause);
     }
 }

@@ -79,4 +79,12 @@ public interface Command extends ControlSignal {
         registerJob.setJobConfiguration(jobConfiguration);
         return registerJob;
     }
+
+    static RequestJob newRequestJob(String jobName) {
+        RequestJob requestJob = new RequestJob();
+        requestJob.setId(UUID.randomUUID().toString());
+        requestJob.setJobName(jobName);
+        requestJob.setControlSignalType(ControlSignalType.REQUEST_JOB);
+        return requestJob;
+    }
 }

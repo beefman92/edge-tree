@@ -2,6 +2,7 @@ package com.my.edge.server.control;
 
 import com.my.edge.common.control.NotResponseWrapper;
 import com.my.edge.common.control.command.Command;
+import com.my.edge.common.control.response.RequestJobResponse;
 import com.my.edge.common.entity.Tuple2;
 import com.my.edge.server.util.JsonSerializer;
 
@@ -27,6 +28,8 @@ public class SignalCollections {
     private Map<String, Set<String>> receivedToSent;
     private Map<String, Set<String>> sentToReceived;
     private ReentrantReadWriteLock lock;
+
+    private Map<String, RequestJobResponse> requestJobResponses;
 
     public SignalCollections() {
         this.selfPendingCommands = new HashMap<>();
@@ -268,5 +271,17 @@ public class SignalCollections {
         } finally {
             lock.readLock().unlock();
         }
+    }
+
+    public RequestJobResponse getRequestJobResponse(String requestId) {
+        return requestJobResponses.get(requestId);
+    }
+
+    public void addRequestJobResponse(String requestId, RequestJobResponse requestJobResponse) {
+        this.requestJobResponses.put(requestId, requestJobResponse);
+    }
+
+    public void removeRequestJobResponse(String requestId) {
+        requestJobResponses.remove(requestId);
     }
 }

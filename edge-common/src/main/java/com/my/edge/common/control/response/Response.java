@@ -2,6 +2,8 @@ package com.my.edge.common.control.response;
 
 import com.my.edge.common.control.ControlSignal;
 import com.my.edge.common.control.ControlSignalType;
+import com.my.edge.common.control.command.RequestJob;
+import com.my.edge.common.job.JobConfiguration;
 
 import java.util.UUID;
 
@@ -67,5 +69,18 @@ public interface Response extends ControlSignal {
         registerJobResponse.setSucceeded(succeeded);
         registerJobResponse.setFailureReason(failureReason);
         return registerJobResponse;
+    }
+
+    static Response newRequestJobResponse(String commandId, JobConfiguration jobConfiguration) {
+        RequestJobResponse requestJobResponse = new RequestJobResponse();
+        requestJobResponse.setId(UUID.randomUUID().toString());
+        requestJobResponse.setControlSignalType(ControlSignalType.REQUEST_JOB);
+        requestJobResponse.setJobConfiguration(jobConfiguration);
+        if (jobConfiguration != null) {
+            requestJobResponse.setHasJob(true);
+        } else {
+            requestJobResponse.setHasJob(false);
+        }
+        return requestJobResponse;
     }
 }

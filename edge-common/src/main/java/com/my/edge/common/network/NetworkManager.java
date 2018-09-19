@@ -77,7 +77,7 @@ public class NetworkManager implements Runnable {
                     ch.pipeline()
                             .addLast(new DataPacketDecoder())
                             .addLast(new DataPacketEncoder())
-                            .addLast(new ServerHandler(messagePool));
+                            .addLast(new DataHandler(messagePool));
                 }
             });
         } catch (Exception e) {
@@ -107,7 +107,7 @@ public class NetworkManager implements Runnable {
                             connections.put(remoteAddress, ch);
                             ch.pipeline().addLast(new DataPacketDecoder())
                                     .addLast(new DataPacketEncoder())
-                                    .addLast(new ServerHandler(messagePool));
+                                    .addLast(new DataHandler(messagePool));
                         }
                     })
                     .option(ChannelOption.SO_BACKLOG, 128)

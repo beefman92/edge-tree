@@ -7,6 +7,7 @@ import com.my.edge.common.data.Data;
 import com.my.edge.common.data.DataTag;
 import com.my.edge.common.data.DataWrapper;
 import com.my.edge.common.entity.Tuple2;
+import com.my.edge.common.job.JobConfiguration;
 import com.my.edge.common.network.NetworkManager;
 import com.my.edge.server.config.NetworkTopology;
 import com.my.edge.server.config.RequiredDataConfig;
@@ -19,10 +20,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.InputStream;
-import java.lang.reflect.Field;
 import java.net.SocketAddress;
 import java.util.*;
-import java.util.function.Consumer;
 
 public class ServerHandler {
     private final Logger logger = LoggerFactory.getLogger(this.getClass());
@@ -75,7 +74,7 @@ public class ServerHandler {
         try (InputStream inputStream = this.getClass().getClassLoader().getResourceAsStream("node-metadata.json")) {
             nodeMetadata = JsonSerializer.objectMapper.readValue(inputStream, NodeMetadata.class);
         } catch (Exception e) {
-            throw new RuntimeException("Initializing ServerHandler failed. ", e);
+            throw new RuntimeException("Initializing DataHandler failed. ", e);
         }
         registerToParents(networkTopology.getParentsAddress());
         try (InputStream inputStream = this.getClass().getClassLoader().getResourceAsStream("required-data.json")) {
@@ -87,7 +86,7 @@ public class ServerHandler {
                 }
             }
         } catch (Exception e) {
-            throw new RuntimeException("Initializing ServerHandler failed. ", e);
+            throw new RuntimeException("Initializing DataHandler failed. ", e);
         }
         commandHandler = new Thread(() -> {
             for (DataTag generatedDataType: generatedData) {
@@ -208,6 +207,10 @@ public class ServerHandler {
             }
             case REGISTER_JOB: {
                 handleRegisterJob(requester, (RegisterJob)command);
+                break;
+            }
+            case REQUEST_JOB: {
+                handleRequestJob(requester, (RequestJob)command);
                 break;
             }
             default:
@@ -465,6 +468,24 @@ public class ServerHandler {
         networkManager.sendResponseAndClose(requester, response);
     }
 
+    private void handleRequestJob(SocketAddress requester, RequestJob requestJob) {
+        String jobName = requestJob.getJobName();
+        JobConfiguration jobConfiguration = jobRepository.getJobConfiguration(jobName);
+        if (jobConfiguration != null) { // 当前节点有job
+            Response response = Response.newRequestJobResponse(requestJob.getId(), jobConfiguration);
+            networkManager.sendResponse(requester, response);
+        } else { // 向其他节点转发请求
+            signalCollections.addNotResponseCommand(requester, requestJob);
+            Iterator<SocketAddress> iterator = networkTopology.getParentsAddress();
+            while (iterator.hasNext()) {
+                SocketAddress parent = iterator.next();
+                RequestJob newRequest = Command.newRequestJob(requestJob.getJobName());
+                signalCollections.addSelfPendingCommands(parent, newRequest);
+                signalCollections.relate(requestJob, newRequest);
+            }
+        }
+    }
+
     private void stopRequestData(SocketAddress requester, Command command) {
 
     }
@@ -494,6 +515,8 @@ public class ServerHandler {
             case REQUEST_DATA: {
                 handleRequestDataResponse(from, (RequestDataResponse) response);
                 break;
+            }
+            case REQUEST_JOB: {
             }
         }
     }
@@ -594,6 +617,65 @@ public class ServerHandler {
         }
     }
 
+    private void handleRequestJobResponse(SocketAddress from, RequestJobResponse requestJobResponse) {
+        String commandId = requestJobResponse.getCommandId();
+        logger.info("Received response of RequestJob for " + commandId + " from " + from + ". ");
+        RequestJob selfPending = (RequestJob) signalCollections.getSelfPendingCommand(commandId);
+        Tuple2<SocketAddress, Command> notResponse = signalCollections.getNotResponseBySentCommandId(commandId);
+        if (notResponse != null) {
+            String jobName = ((RequestJob)notResponse.getValue2()).getJobName();
+            NotResponseWrapper.ResponseStatus commandStatus = signalCollections.getNotResponseCommandStatus(
+                    notResponse.getValue2().getId());
+            if (requestJobResponse.isHasJob()) {
+                // 远端请求到了数据
+                if (commandStatus == NotResponseWrapper.ResponseStatus.SUCCEEDED_ONCE) {
+                    // 之前已经向下游节点通报了请求数据成功的消息，因此不再进行通报，只需删除相应的请求即可
+                    signalCollections.removeCommands(notResponse.getValue2(), notResponse.getValue1(), selfPending, from);
+                    logger.info("Since current node has found request job " + jobName +
+                            " for " + notResponse.getValue1() + " and informed it, ignoring this success response. ");
+                } else {
+                    // 删除相应的请求，设置返回状态，进行通报
+                    int count = signalCollections.removeCommands(notResponse.getValue2(), notResponse.getValue1(), selfPending, from);
+                    if (count > 0) {
+                        signalCollections.setNotResponseCommandStatus(notResponse.getValue2().getId(),
+                                NotResponseWrapper.ResponseStatus.SUCCEEDED_ONCE);
+                    }
+                    logger.info("Current node find request job " + jobName + " for " + notResponse.getValue1() +
+                            ". Sending success response to it. ");
+                    Response response = Response.newRequestJobResponse(notResponse.getValue2().getId(),
+                            requestJobResponse.getJobConfiguration());
+                    networkManager.sendResponse(notResponse.getValue1(), response);
+                }
+            } else {
+                // 未请求到数据
+                if (commandStatus == NotResponseWrapper.ResponseStatus.SUCCEEDED_ONCE) {
+                    // 不向下游节点进行通报，删除相应的请求
+                    signalCollections.removeCommands(notResponse.getValue2(), notResponse.getValue1(), selfPending, from);
+                    logger.info("Since current node has found request job " + jobName +
+                            " for " + notResponse.getValue1() + " and informed it, ignoring this failure response. ");
+                } else {
+                    // 删除相应的请求。如果删除请求后not-response command的引用数为零，则向下游通报请求失败的消息
+                    int count = signalCollections.removeCommands(notResponse.getValue2(), notResponse.getValue1(), selfPending, from);
+                    if (count == 0) {
+                        Response response = Response.newRequestJobResponse(notResponse.getValue2().getId(),
+                                null);
+                        logger.info("Since all relayed request for job " + jobName + " failed, " +
+                                "sending failure response to node " + notResponse.getValue1());
+                        networkManager.sendResponse(notResponse.getValue1(), response);
+                    } else {
+                        signalCollections.setNotResponseCommandStatus(notResponse.getValue2().getId(),
+                                NotResponseWrapper.ResponseStatus.FAILED);
+                        logger.info("Ignoring this failure response for request job " + jobName +
+                                ", and waiting for other response. ");
+                    }
+                }
+            }
+        } else {
+            signalCollections.removeSelfPendingCommand(requestJobResponse.getCommandId());
+            signalCollections.addRequestJobResponse(requestJobResponse.getId(), requestJobResponse);
+        }
+    }
+
     public void setNetworkTopology(NetworkTopology networkTopology) {
         this.networkTopology = networkTopology;
     }
@@ -644,6 +726,66 @@ public class ServerHandler {
     public void registerToParent(SocketAddress parent) {
         Command register = Command.newRegisterCommand(this.nodeMetadata);
         networkManager.sendCommand(parent, register);
+    }
+
+
+    /**
+     * 根据jobName请求JobConfiguration信息，目前只会向parents请求job。
+     * 如果当前节点的JobRepository中有目标Job，返回相应的JobConfiguration
+     * 否则向远端节点进行请求。这是一个阻塞的方法
+     * @param jobName job name
+     * @return 找到job，返回JobConfiguration；否则返回null
+     */
+    public JobConfiguration requestJobConfiguration(String jobName, boolean cache) {
+        JobConfiguration jobConfiguration = jobRepository.getJobConfiguration(jobName);
+        if (jobConfiguration == null) {
+            List<String> requestIds = new ArrayList<>();
+            Iterator<SocketAddress> iterator = networkTopology.getParentsAddress();
+            while (iterator.hasNext()) {
+                RequestJob requestJob = Command.newRequestJob(jobName);
+                SocketAddress parent = iterator.next();
+                networkManager.sendCommand(parent, requestJob);
+                requestIds.add(requestJob.getId());
+            }
+            List<Integer> removedIndices = new ArrayList<>();
+            boolean stop = false;
+            while (!stop) {
+                try {
+                    Thread.sleep(1000L);
+                    for (int i = 0; i < requestIds.size(); i++) {
+                        String id = requestIds.get(i);
+                        RequestJobResponse response = signalCollections.getRequestJobResponse(id);
+                        if (response != null) {
+                            removedIndices.add(i);
+                            signalCollections.removeRequestJobResponse(id);
+                            if (response.isHasJob()) {
+                                jobConfiguration = response.getJobConfiguration();
+                                stop = true;
+                            }
+                        }
+                    }
+                    if (stop) {
+                        removedIndices.clear();
+                        requestIds.clear();
+                    } else {
+                        for (int i = removedIndices.size() - 1; i >= 0; i--) {
+                            Integer index = removedIndices.get(i);
+                            requestIds.remove(index);
+                        }
+                        if (requestIds.isEmpty()) {
+                            stop = true;
+                        }
+                    }
+                } catch (Exception e) {
+                    logger.warn("Requesting job encounter error. ", e);
+                }
+            }
+
+            if (jobConfiguration != null && cache) {
+                jobRepository.addJobConfiguration(jobConfiguration);
+            }
+        }
+        return jobConfiguration;
     }
 
     public void start() {
