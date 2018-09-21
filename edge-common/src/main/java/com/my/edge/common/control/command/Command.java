@@ -87,4 +87,12 @@ public interface Command extends ControlSignal {
         requestJob.setControlSignalType(ControlSignalType.REQUEST_JOB);
         return requestJob;
     }
+
+    static RunJob newRunJob(String jobName) {
+        RunJob runJob = new RunJob();
+        runJob.setId(UUID.randomUUID().toString());
+        runJob.setControlSignalType(ControlSignalType.RUN_JOB);
+        runJob.setJobName(jobName);
+        return runJob;
+    }
 }

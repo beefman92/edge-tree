@@ -36,6 +36,7 @@ public class SignalCollections {
         this.notResponseCommands = new HashMap<>();
         this.receivedToSent = new HashMap<>();
         this.sentToReceived = new HashMap<>();
+        this.requestJobResponses = new HashMap<>();
         lock = new ReentrantReadWriteLock();
     }
 

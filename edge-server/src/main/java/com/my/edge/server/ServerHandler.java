@@ -50,6 +50,7 @@ public class ServerHandler {
     private Thread dataHandler;
     private NetworkTopology networkTopology;
     private NetworkManager networkManager;
+    private NodeManager nodeManager;
 
     // 当前节点的nodeMetadata应该表示的是所有子节点的NodeMetadata之并
     private NodeMetadata nodeMetadata;
@@ -211,6 +212,10 @@ public class ServerHandler {
             }
             case REQUEST_JOB: {
                 handleRequestJob(requester, (RequestJob)command);
+                break;
+            }
+            case RUN_JOB: {
+                handleRunJob(requester, (RunJob)command);
                 break;
             }
             default:
@@ -480,10 +485,18 @@ public class ServerHandler {
             while (iterator.hasNext()) {
                 SocketAddress parent = iterator.next();
                 RequestJob newRequest = Command.newRequestJob(requestJob.getJobName());
+                networkManager.sendCommand(parent, newRequest);
                 signalCollections.addSelfPendingCommands(parent, newRequest);
                 signalCollections.relate(requestJob, newRequest);
             }
         }
+    }
+
+    private void handleRunJob(SocketAddress socketAddress, RunJob runJob) {
+        String jobName = runJob.getJobName();
+        nodeManager.addRunJob(runJob);
+        Response response = Response.newRunJobResponse(runJob.getId(), runJob.getJobName(), true, null);
+        networkManager.sendResponse(socketAddress, response);
     }
 
     private void stopRequestData(SocketAddress requester, Command command) {
@@ -517,6 +530,8 @@ public class ServerHandler {
                 break;
             }
             case REQUEST_JOB: {
+                handleRequestJobResponse(from, (RequestJobResponse) response);
+                break;
             }
         }
     }
@@ -672,7 +687,7 @@ public class ServerHandler {
             }
         } else {
             signalCollections.removeSelfPendingCommand(requestJobResponse.getCommandId());
-            signalCollections.addRequestJobResponse(requestJobResponse.getId(), requestJobResponse);
+            signalCollections.addRequestJobResponse(requestJobResponse.getCommandId(), requestJobResponse);
         }
     }
 
@@ -682,6 +697,10 @@ public class ServerHandler {
 
     public void setNetworkManager(NetworkManager networkManager) {
         this.networkManager = networkManager;
+    }
+
+    public void setNodeManager(NodeManager nodeManager) {
+        this.nodeManager = nodeManager;
     }
 
     public void setIsTop(boolean isTop) {
@@ -745,6 +764,7 @@ public class ServerHandler {
                 RequestJob requestJob = Command.newRequestJob(jobName);
                 SocketAddress parent = iterator.next();
                 networkManager.sendCommand(parent, requestJob);
+                signalCollections.addSelfPendingCommands(parent, requestJob);
                 requestIds.add(requestJob.getId());
             }
             List<Integer> removedIndices = new ArrayList<>();

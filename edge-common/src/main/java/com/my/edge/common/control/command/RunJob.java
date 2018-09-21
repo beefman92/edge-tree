@@ -4,15 +4,13 @@ import com.my.edge.common.control.ControlSignalType;
 
 import java.util.Objects;
 
-import static com.my.edge.common.control.ControlSignalType.REQUEST_JOB;
-
 /**
  * Creator: Beefman
- * Date: 2018/9/15
+ * Date: 2018/9/21
  */
-public class RequestJob implements Command {
+public class RunJob implements Command {
     private String id;
-    private ControlSignalType controlSignalType = REQUEST_JOB;
+    private ControlSignalType controlSignalType = ControlSignalType.RUN_JOB;
     private String jobName;
 
     @Override
@@ -20,13 +18,13 @@ public class RequestJob implements Command {
         return id;
     }
 
+    public void setId(String id) {
+        this.id = id;
+    }
+
     @Override
     public ControlSignalType getControlSignalType() {
         return controlSignalType;
-    }
-
-    public void setId(String id) {
-        this.id = id;
     }
 
     public void setControlSignalType(ControlSignalType controlSignalType) {
@@ -45,10 +43,10 @@ public class RequestJob implements Command {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        RequestJob that = (RequestJob) o;
-        return Objects.equals(id, that.id) &&
-                controlSignalType == that.controlSignalType &&
-                Objects.equals(jobName, that.jobName);
+        RunJob runJob = (RunJob) o;
+        return Objects.equals(id, runJob.id) &&
+                controlSignalType == runJob.controlSignalType &&
+                Objects.equals(jobName, runJob.jobName);
     }
 
     @Override

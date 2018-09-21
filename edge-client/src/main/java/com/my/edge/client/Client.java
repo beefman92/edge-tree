@@ -4,7 +4,9 @@ package com.my.edge.client;
 import com.my.edge.common.control.ControlSignal;
 import com.my.edge.common.control.command.Command;
 import com.my.edge.common.control.command.RegisterJob;
+import com.my.edge.common.control.command.RunJob;
 import com.my.edge.common.control.response.RegisterJobResponse;
+import com.my.edge.common.control.response.RunJobResponse;
 import com.my.edge.common.entity.Tuple2;
 import com.my.edge.common.job.FileRecord;
 import com.my.edge.common.job.JobConfiguration;
@@ -38,22 +40,22 @@ public class Client {
         networkManager.run();
     }
 
-    private Config parse(String[] args) {
+    private RegisterConfig parseRegisterConfig(String[] args) {
         Map<String, String> parameters = new HashMap<>();
         for (int i = 0; i < args.length; i += 2) {
             String key = args[i];
             String value = args[i + 1];
             parameters.put(key, value);
         }
-        Config config = new Config();
+        RegisterConfig registerConfig = new RegisterConfig();
         String name = getValue(parameters, "--name", false);
         String consumer = getValue(parameters, "--consumer", false);
         String producer = getValue(parameters, "--producer", false);
         String jars = getValue(parameters, "--jars", false);
         String resources = getValue(parameters, "--resources", true);
-        config.setJobName(name);
-        config.setConsumerClass(consumer);
-        config.setProducerClass(producer);
+        registerConfig.setJobName(name);
+        registerConfig.setConsumerClass(consumer);
+        registerConfig.setProducerClass(producer);
         String[] jarsPath = jars.split(",");
         List<File> jarsFile = new ArrayList<>();
         for (String jarPath: jarsPath) {
@@ -62,7 +64,7 @@ public class Client {
                 collectFileRecursively(file, jarsFile, ".jar");
             }
         }
-        config.setJarFiles(jarsFile);
+        registerConfig.setJarFiles(jarsFile);
         if (StringUtils.isNotBlank(resources)) {
             String[] resourcesPath = resources.split(",");
             List<File> resourcesFile = new ArrayList<>();
@@ -72,23 +74,36 @@ public class Client {
                     collectFileRecursively(file, resourcesFile, null);
                 }
             }
-            config.setResourceFiles(resourcesFile);
+            registerConfig.setResourceFiles(resourcesFile);
         }
-        return config;
+        return registerConfig;
     }
 
-    private JobConfiguration constructJobConfiguration(Config config) {
+    private RunJobConfig parseRunJobConfig(String[] args) {
+        Map<String, String> parameters = new HashMap<>();
+        for (int i = 0; i < args.length; i += 2) {
+            String key = args[i];
+            String value = args[i + 1];
+            parameters.put(key, value);
+        }
+        RunJobConfig runJobConfig = new RunJobConfig();
+        String jobName = getValue(parameters, "--name", true);
+        runJobConfig.setJobName(jobName);
+        return runJobConfig;
+    }
+
+    private JobConfiguration constructJobConfiguration(RegisterConfig registerConfig) {
         JobConfiguration jobConfiguration = new JobConfiguration();
-        jobConfiguration.setJobName(config.getJobName());
-        jobConfiguration.setProducerClass(config.getProducerClass());
-        jobConfiguration.setConsumerClass(config.getConsumerClass());
-        for (File jarFile: config.getJarFiles()) {
+        jobConfiguration.setJobName(registerConfig.getJobName());
+        jobConfiguration.setProducerClass(registerConfig.getProducerClass());
+        jobConfiguration.setConsumerClass(registerConfig.getConsumerClass());
+        for (File jarFile: registerConfig.getJarFiles()) {
             logger.info("Adding jar " + jarFile.getAbsolutePath() + " to JobConfiguration. ");
             FileRecord fileRecord = generateFileRecord(jarFile);
             jobConfiguration.addJar(fileRecord);
         }
-        if (config.getResourceFiles() != null) {
-            for (File resourceFile: config.getResourceFiles()) {
+        if (registerConfig.getResourceFiles() != null) {
+            for (File resourceFile: registerConfig.getResourceFiles()) {
                 logger.info("Adding resource file " + resourceFile.getAbsolutePath() + " to JobConfiguration. ");
                 FileRecord fileRecord = generateFileRecord(resourceFile);
                 jobConfiguration.addResource(fileRecord);
@@ -115,8 +130,8 @@ public class Client {
     }
 
     public void registerJob(String[] args) {
-        Config config = parse(args);
-        JobConfiguration jobConfiguration = constructJobConfiguration(config);
+        RegisterConfig registerConfig = parseRegisterConfig(args);
+        JobConfiguration jobConfiguration = constructJobConfiguration(registerConfig);
         RegisterJob registerJob = Command.newJobRegister(jobConfiguration);
         String nodeAddress = System.getenv("EDGE_SERVER");
         String[] parts = nodeAddress.split(":");
@@ -134,6 +149,27 @@ public class Client {
         } else {
             logger.info("Registering job " + jobConfiguration.getJobName() + " failed with reason: " +
                     response.getFailureReason());
+        }
+    }
+
+    public void runJob(String[] args) {
+        RunJobConfig runJobConfig = parseRunJobConfig(args);
+        RunJob runJob = Command.newRunJob(runJobConfig.getJobName());
+        String nodeAddress = System.getenv("EDGE_SERVER");
+        String[] parts = nodeAddress.split(":");
+        SocketAddress address = new InetSocketAddress(parts[0], Integer.valueOf(parts[1]));
+        logger.info("Running job " + runJobConfig.getJobName() + " on node " + address);
+        networkManager.sendCommand(address, runJob);
+        logger.info("Waiting response... ");
+        Tuple2<SocketAddress, ControlSignal> tuple = networkManager.fetchControlSignal();
+        if (!address.equals(tuple.getValue1()) || tuple.getValue2().getClass() != RunJobResponse.class) {
+            throw new RuntimeException("嗯?!");
+        }
+        RunJobResponse runJobResponse = (RunJobResponse) tuple.getValue2();
+        if (runJobResponse.isSucceeded()) {
+            logger.info("Job " + runJobResponse.getJobName() + " starts running on node " + address);
+        } else {
+            logger.info("Job " + runJobResponse + " fail to start on node " + address);
         }
     }
 
@@ -164,7 +200,17 @@ public class Client {
 
     public static void main(String[] args) {
         Client client = new Client();
-        client.registerJob(args);
+        String commandType = args[0];
+        String[] args0 = new String[args.length - 1];
+        for (int i = 1; i < args.length; i++) {
+            args0[i - 1] = args[i];
+        }
+        if ("register".equals(commandType)) {
+            client.registerJob(args0);
+        }
+        if ("run".equals(commandType)) {
+            client.runJob(args0);
+        }
     }
 
 

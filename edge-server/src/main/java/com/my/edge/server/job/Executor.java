@@ -6,8 +6,9 @@ import com.my.edge.common.job.JobConfiguration;
 import com.my.edge.common.job.Producer;
 import com.my.edge.server.ServerHandler;
 import com.my.edge.server.config.Configuration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import javax.management.RuntimeErrorException;
 import java.io.*;
 import java.net.URL;
 import java.net.URLClassLoader;
@@ -20,6 +21,7 @@ import java.util.UUID;
  * Date: 2018/9/15
  */
 public class Executor implements Runnable {
+    private Logger logger = LoggerFactory.getLogger(this.getClass());
     private String jobName;
     private ServerHandler serverHandler;
     private Configuration configuration;
@@ -48,8 +50,44 @@ public class Executor implements Runnable {
                 Producer producer = (Producer) producerClass.newInstance();
                 producer.produce(null, null );
             }
-        } catch (Exception e) {
-            throw new RuntimeException("Running job " + jobConfiguration.getJobName() + " failed. ", e);
+        } catch (Throwable e) {
+            logger.error("Running job " + jobName + " failed. ", e);
+        } finally {
+            try {
+                urlClassLoader.close();
+            } catch (Throwable t) {
+                logger.warn("Closing class loader of job " + jobName + " encounters exception. ", t);
+            }
+            recursivelyDelete(jobDir);
+            logger = null;
+            jobName = null;
+            serverHandler = null;
+            configuration = null;
+            jobConfiguration = null;
+            jobDir = null;
+            urlClassLoader = null;
+        }
+    }
+
+    private void recursivelyDelete(File file) {
+        if (file != null) {
+            if (file.isFile()) {
+                if (!file.delete()) {
+                    logger.warn("Delete file " + file.getAbsolutePath() + " failed. ");
+                } else {
+                    logger.debug("Delete temporary file " + file.getAbsolutePath());
+                }
+            } else {
+                File[] subFiles = file.listFiles();
+                for (File subFile: subFiles) {
+                    recursivelyDelete(subFile);
+                }
+                if (!file.delete()) {
+                    logger.warn("Delete directory " + file.getAbsolutePath() + " failed. ");
+                } else {
+                    logger.debug("Delete temporary file " + file.getAbsolutePath());
+                }
+            }
         }
     }
 
@@ -78,6 +116,7 @@ public class Executor implements Runnable {
                         outputStream.write(buffer, 0, length);
                     }
                 }
+                logger.debug("Create temporary file " + file.getAbsolutePath());
                 URL url = file.toURI().toURL();
                 fileURLs.add(url);
             }

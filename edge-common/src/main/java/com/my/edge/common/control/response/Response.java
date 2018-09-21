@@ -75,6 +75,7 @@ public interface Response extends ControlSignal {
         RequestJobResponse requestJobResponse = new RequestJobResponse();
         requestJobResponse.setId(UUID.randomUUID().toString());
         requestJobResponse.setControlSignalType(ControlSignalType.REQUEST_JOB);
+        requestJobResponse.setCommandId(commandId);
         requestJobResponse.setJobConfiguration(jobConfiguration);
         if (jobConfiguration != null) {
             requestJobResponse.setHasJob(true);
@@ -82,5 +83,16 @@ public interface Response extends ControlSignal {
             requestJobResponse.setHasJob(false);
         }
         return requestJobResponse;
+    }
+
+    static Response newRunJobResponse(String commandId, String jobName, boolean succeeded, String failureReason) {
+        RunJobResponse runJobResponse = new RunJobResponse();
+        runJobResponse.setId(UUID.randomUUID().toString());
+        runJobResponse.setCommandId(commandId);
+        runJobResponse.setControlSignalType(ControlSignalType.RUN_JOB);
+        runJobResponse.setJobName(jobName);
+        runJobResponse.setSucceeded(succeeded);
+        runJobResponse.setFailureReason(failureReason);
+        return runJobResponse;
     }
 }

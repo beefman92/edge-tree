@@ -8,14 +8,14 @@ import java.util.List;
  * Creator: Beefman
  * Date: 2018/9/14
  */
-public class Config {
+public class RegisterConfig {
     private String jobName;
     private List<File> jarFiles;
     private List<File> resourceFiles;
     private String producerClass;
     private String consumerClass;
 
-    public Config() {
+    public RegisterConfig() {
         this.jarFiles = new ArrayList<>();
         this.resourceFiles = new ArrayList<>();
     }
