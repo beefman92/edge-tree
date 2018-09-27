@@ -51,11 +51,15 @@ public class Client {
         String name = getValue(parameters, "--name", false);
         String consumer = getValue(parameters, "--consumer", false);
         String producer = getValue(parameters, "--producer", false);
+        String dataTag = getValue(parameters, "--data-tag", false);
+        String nodeFilter = getValue(parameters, "--node-filter", false);
         String jars = getValue(parameters, "--jars", false);
         String resources = getValue(parameters, "--resources", true);
         registerConfig.setJobName(name);
         registerConfig.setConsumerClass(consumer);
         registerConfig.setProducerClass(producer);
+        registerConfig.setDataTagClass(dataTag);
+        registerConfig.setNodeFilterClass(nodeFilter);
         String[] jarsPath = jars.split(",");
         List<File> jarsFile = new ArrayList<>();
         for (String jarPath: jarsPath) {
@@ -97,6 +101,8 @@ public class Client {
         jobConfiguration.setJobName(registerConfig.getJobName());
         jobConfiguration.setProducerClass(registerConfig.getProducerClass());
         jobConfiguration.setConsumerClass(registerConfig.getConsumerClass());
+        jobConfiguration.setDataTagClass(registerConfig.getDataTagClass());
+        jobConfiguration.setNodeFilterClass(registerConfig.getNodeFilterClass());
         for (File jarFile: registerConfig.getJarFiles()) {
             logger.info("Adding jar " + jarFile.getAbsolutePath() + " to JobConfiguration. ");
             FileRecord fileRecord = generateFileRecord(jarFile);
@@ -155,6 +161,9 @@ public class Client {
     public void runJob(String[] args) {
         RunJobConfig runJobConfig = parseRunJobConfig(args);
         RunJob runJob = Command.newRunJob(runJobConfig.getJobName());
+        // demo code start
+        runJob.setConsumer(true);
+        // demo code end
         String nodeAddress = System.getenv("EDGE_SERVER");
         String[] parts = nodeAddress.split(":");
         SocketAddress address = new InetSocketAddress(parts[0], Integer.valueOf(parts[1]));
@@ -198,6 +207,10 @@ public class Client {
         return value;
     }
 
+    public void shutdown() {
+        networkManager.shutdownClient();
+    }
+
     public static void main(String[] args) {
         Client client = new Client();
         String commandType = args[0];
@@ -211,6 +224,7 @@ public class Client {
         if ("run".equals(commandType)) {
             client.runJob(args0);
         }
+        client.shutdown();
     }
 
 

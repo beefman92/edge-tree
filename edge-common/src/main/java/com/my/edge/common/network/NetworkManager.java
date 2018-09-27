@@ -123,6 +123,12 @@ public class NetworkManager implements Runnable {
         }
     }
 
+    public void shutdownClient() {
+        if (clientGroup != null) {
+            clientGroup.shutdownGracefully();
+        }
+    }
+
     @Override
     public void run() {
         if (mode == SERVER_AND_CLIENT || mode == SERVER_ONLY) {

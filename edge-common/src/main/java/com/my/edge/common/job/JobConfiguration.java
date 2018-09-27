@@ -11,6 +11,8 @@ public class JobConfiguration {
     private String jobName;
     private String consumerClass;
     private String producerClass;
+    private String dataTagClass;
+    private String nodeFilterClass;
     private List<FileRecord> jars;
     private List<FileRecord> resources;
 
@@ -66,5 +68,21 @@ public class JobConfiguration {
             resources = new ArrayList<>();
         }
         resources.add(resource);
+    }
+
+    public String getDataTagClass() {
+        return dataTagClass;
+    }
+
+    public void setDataTagClass(String dataTagClass) {
+        this.dataTagClass = dataTagClass;
+    }
+
+    public String getNodeFilterClass() {
+        return nodeFilterClass;
+    }
+
+    public void setNodeFilterClass(String nodeFilterClass) {
+        this.nodeFilterClass = nodeFilterClass;
     }
 }

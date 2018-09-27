@@ -14,6 +14,8 @@ public class RegisterConfig {
     private List<File> resourceFiles;
     private String producerClass;
     private String consumerClass;
+    private String dataTagClass;
+    private String nodeFilterClass;
 
     public RegisterConfig() {
         this.jarFiles = new ArrayList<>();
@@ -72,5 +74,21 @@ public class RegisterConfig {
             resourceFiles = new ArrayList<>();
         }
         resourceFiles.add(resourceFile);
+    }
+
+    public String getDataTagClass() {
+        return dataTagClass;
+    }
+
+    public void setDataTagClass(String dataTagClass) {
+        this.dataTagClass = dataTagClass;
+    }
+
+    public String getNodeFilterClass() {
+        return nodeFilterClass;
+    }
+
+    public void setNodeFilterClass(String nodeFilterClass) {
+        this.nodeFilterClass = nodeFilterClass;
     }
 }

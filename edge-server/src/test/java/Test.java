@@ -1,6 +1,6 @@
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.my.edge.common.data.DataTag;
-import com.my.edge.server.demo.DemoDataTag;
+import com.my.edge.examples.DemoDataTag;
 import com.my.edge.server.demo.DemoNodeMetadata;
 
 import java.util.HashSet;

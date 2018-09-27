@@ -1,4 +1,4 @@
-package com.my.edge.server.demo;
+package com.my.edge.examples;
 
 import com.my.edge.common.control.NodeFilter;
 import com.my.edge.common.control.NodeMetadata;
@@ -6,9 +6,6 @@ import com.my.edge.common.control.NodeMetadata;
 public class DemoNodeFilter implements NodeFilter {
     @Override
     public boolean matches(NodeMetadata nodeMetadata) {
-        if (nodeMetadata.getClass() != DemoNodeMetadata.class) {
-            return false;
-        }
         return true;
     }
 

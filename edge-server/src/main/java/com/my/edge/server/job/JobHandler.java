@@ -35,7 +35,7 @@ public class JobHandler implements Runnable {
             RunJob runJob = runJobs.peek();
             if (runJob != null) {
                 String jobName = runJob.getJobName();
-                Executor executor = new Executor(jobName, serverHandler, configuration, true);
+                Executor executor = new Executor(jobName, serverHandler, configuration, runJob.isConsumer());
                 executorService.submit(executor);
                 runJobs.remove();
             }

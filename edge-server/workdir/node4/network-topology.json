@@ -1,7 +1,7 @@
 {
   "parents" : [{
     "host" : "localhost",
-    "port" : 9502
+    "port" : 9501
   }],
   "siblings" : [],
   "children" : []

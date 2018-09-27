@@ -19,6 +19,11 @@
             <artifactId>edge-common</artifactId>
             <version>1.0</version>
         </dependency>
+        <dependency>
+            <groupId>com.my.edge</groupId>
+            <artifactId>edge-examples</artifactId>
+            <version>1.0</version>
+        </dependency>
     </dependencies>
     <build>
         <plugins>

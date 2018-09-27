@@ -13,8 +13,9 @@ import com.my.edge.server.config.NetworkTopology;
 import com.my.edge.server.config.RequiredDataConfig;
 import com.my.edge.server.control.SignalCollections;
 import com.my.edge.server.data.*;
-import com.my.edge.server.demo.DemoNodeFilter;
+import com.my.edge.server.job.JobHandler;
 import com.my.edge.server.job.JobRepository;
+import com.my.edge.server.job.Transmitter;
 import com.my.edge.server.util.JsonSerializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,11 +37,6 @@ public class ServerHandler {
      */
     private Set<DataTag> generatedData = new HashSet<>();
 
-    /*
-    记录当前节点生成的数据应该通过哪个DataExport进行转发。从其他节点转发的数据不在这里记录。
-     */
-    private Map<DataTag, List<DataExport>> dataTransmission = new HashMap<>();
-
     private SignalCollections signalCollections = new SignalCollections();
     private DataChannels dataChannels = new DataChannels();
     private JobRepository jobRepository = new JobRepository();
@@ -51,12 +47,17 @@ public class ServerHandler {
     private NetworkTopology networkTopology;
     private NetworkManager networkManager;
     private NodeManager nodeManager;
+    private JobHandler jobHandler;
 
     // 当前节点的nodeMetadata应该表示的是所有子节点的NodeMetadata之并
     private NodeMetadata nodeMetadata;
 
     public ServerHandler() {
 
+    }
+
+    public void setJobHandler(JobHandler jobHandler) {
+        this.jobHandler = jobHandler;
     }
 
     public ServerHandler(boolean isTop) {
@@ -101,7 +102,7 @@ public class ServerHandler {
                 Iterator<Map.Entry<SocketAddress, NodeMetadata>> parents = networkTopology.getParents();
                 while (parents.hasNext()) {
                     Map.Entry<SocketAddress, NodeMetadata> parent = parents.next();
-                    requestData(parent.getKey(), requiredDataTag);
+                    requestData(parent.getKey(), null, requiredDataTag, null);
                 }
             }
             while (true) {
@@ -133,8 +134,10 @@ public class ServerHandler {
                     Data data = dataWrapper.getData();
                     List<String> dataImportsId = dataWrapper.getDataExportsId();
                     Map<SocketAddress, Set<DataExport>> dataExports = new HashMap<>();
-                    if (!dataImportsId.isEmpty()) { // 从其他节点转发来的数据
+                    List<Transmitter> consuming = new ArrayList<>();
+                    if (!dataImportsId.isEmpty()) { // 从其他节点发来的数据
                         for (String dataImportId: dataImportsId) {
+                            // 转发至其他节点
                             DataExport dataExport = dataChannels.getDataExportByDataImportId(dataImportId);
                             if (dataExport != null) {
                                 Set<DataExport> part = dataExports.computeIfAbsent(dataExport.getTarget(), (key) -> {
@@ -142,9 +145,15 @@ public class ServerHandler {
                                 });
                                 part.add(dataExport);
                             }
+
+                            // 当前节点消费
+                            List<Transmitter> temp = dataChannels.getTransmitters(dataImportId);
+                            if (temp != null) {
+                                consuming.addAll(temp);
+                            }
                         }
                     } else { // 当前节点生成的数据
-                        List<DataExport> temp = dataTransmission.get(data.getDataTag());
+                        List<DataExport> temp = dataChannels.getGeneratedDataTrasmission(data.getDataTag());
                         if (temp != null) {
                             for (DataExport dataExport: temp) {
                                 Set<DataExport> part = dataExports.computeIfAbsent(dataExport.getTarget(), (key) -> {
@@ -153,6 +162,10 @@ public class ServerHandler {
                                 part.add(dataExport);
                             }
                         }
+                    }
+
+                    for (Transmitter transmitter: consuming) {
+                        transmitter.addNewData(data);
                     }
 
                     for (Map.Entry<SocketAddress, Set<DataExport>> keyValue: dataExports.entrySet()) {
@@ -253,15 +266,18 @@ public class ServerHandler {
             String dataExportId = requestData.getImportId();
             DataExport dataExport = new DataExport(dataExportId, requester);
             dataChannels.addDataExport(dataExport);
-            List<DataExport> exports = dataTransmission.computeIfAbsent(dataTag, key -> {
-                return new ArrayList<>();
-            });
-            exports.add(dataExport);
+            dataChannels.combineDataTagWithDataExport(dataTag, dataExport);
             Response response = Response.newRequestDataResponse(
                     requestData.getId(), true, dataExportId);
             networkManager.sendResponse(requester, response);
             responded = true;
             definitelyNotMatched = false;
+
+            // demo code start
+            RunJob runJob = Command.newRunJob("test-register-job");
+            runJob.setConsumer(false);
+            jobHandler.addRunJob(runJob);
+            // demo code end
         }
 
         // 向别的节点进行请求
@@ -628,7 +644,12 @@ public class ServerHandler {
             }
 
         } else { // 请求数据的节点
-            // TODO: 请求数据的节点的逻辑
+            signalCollections.removeSelfPendingCommand(commandId);
+            if (requestDataResponse.isHasData()) {
+                // TODO: 在DataChannels中将对应的Transmitter标记为有效的
+            } else {
+                // TODO: 移除对应的DataImport和Transmitter
+            }
         }
     }
 
@@ -724,13 +745,21 @@ public class ServerHandler {
         networkManager.sendCommand(remote, supplyData);
     }
 
-    public void requestData(SocketAddress remote, DataTag dataTag) {
+    public void requestData(SocketAddress remote, NodeFilter nodeFilter, DataTag dataTag, Transmitter transmitter) {
         DataImport dataImport = new DataImport(UUID.randomUUID().toString(), remote);
         dataChannels.addDataImport(dataImport);
-        NodeFilter nodeFilter = new DemoNodeFilter();
+        dataChannels.markConsumeData(dataImport, transmitter);
         Command request = Command.newRequestDataCommand(dataTag, nodeFilter, dataImport.getId());
         signalCollections.addSelfPendingCommands(remote, request);
         networkManager.sendCommand(remote, request);
+    }
+
+    public void requestData(NodeFilter nodeFilter, DataTag dataTag, Transmitter transmitter) {
+        Iterator<SocketAddress> iterator = networkTopology.getParentsAddress();
+        while (iterator.hasNext()) {
+            SocketAddress parent = iterator.next();
+            requestData(parent, nodeFilter, dataTag, transmitter);
+        }
     }
 
     public void registerToParents(Iterator<SocketAddress> parents) {

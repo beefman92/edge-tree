@@ -1,4 +1,4 @@
-package com.my.edge.server.demo;
+package com.my.edge.examples;
 
 
 import com.my.edge.common.data.DataTag;
@@ -15,7 +15,7 @@ public class DemoDataTag implements DataTag {
         DEMO_DATA_TAG_1.setDataTypeInfo("TEST_DATA");
     }
 
-    private String dataTypeInfo;
+    private String dataTypeInfo = "TEST_DATA";
 
     public String getDataTypeInfo() {
         return dataTypeInfo;

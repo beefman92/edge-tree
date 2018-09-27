@@ -1,5 +1,6 @@
 package com.my.edge.examples;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.my.edge.common.data.Data;
 import com.my.edge.common.data.DataTag;
 
@@ -9,13 +10,16 @@ import com.my.edge.common.data.DataTag;
  */
 public class SimpleData implements Data<String> {
     private String field;
-    private SimpleDataTag simpleDataTag = new SimpleDataTag();
+    private long timestamp;
+    private DemoDataTag demoDataTag = DemoDataTag.DEMO_DATA_TAG_1;
 
+    @JsonIgnore
     @Override
     public DataTag getDataTag() {
-        return simpleDataTag;
+        return demoDataTag;
     }
 
+    @JsonIgnore
     @Override
     public String getValue() {
         return null;
@@ -25,7 +29,29 @@ public class SimpleData implements Data<String> {
         this.field = field;
     }
 
-    public void setSimpleDataTag(SimpleDataTag simpleDataTag) {
-        this.simpleDataTag = simpleDataTag;
+    public String getField() {
+        return field;
+    }
+
+    public DemoDataTag getDemoDataTag() {
+        return demoDataTag;
+    }
+
+    public void setDemoDataTag(DemoDataTag demoDataTag) {
+        this.demoDataTag = demoDataTag;
+    }
+
+    public void setSimpleDataTag(DemoDataTag demoDataTag) {
+        this.demoDataTag = demoDataTag;
+    }
+
+    @Override
+    public long getTimestamp() {
+        return timestamp;
+    }
+
+    @Override
+    public void setTimestamp(long timestamp) {
+        this.timestamp = timestamp;
     }
 }

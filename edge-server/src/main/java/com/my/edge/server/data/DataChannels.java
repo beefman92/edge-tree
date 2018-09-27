@@ -1,5 +1,9 @@
 package com.my.edge.server.data;
 
+import com.my.edge.common.data.DataTag;
+import com.my.edge.server.job.Transmitter;
+import com.my.edge.server.job.WindowTransmitter;
+
 import java.util.*;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -14,6 +18,17 @@ public class DataChannels {
     private Map<String, String> exportToImport = new HashMap<>();
     private Map<Object, Integer> referenceCounts = new HashMap<>();
     private ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
+
+    /*
+    记录当前节点生成的数据应该通过哪个DataExport进行转发。从其他节点转发的数据不在这里记录。
+     */
+    private Map<DataTag, List<DataExport>> generatedDataTransmission = new HashMap<>();
+
+    /*
+    当前节点消费的数据
+     */
+    // TODO: 需要对Transmitter进行标记。在得到RequestDataResponse之前，相应的Transmitter应该标记为无效的。不应该出现在getTransmitters的结果中
+    private Map<String, List<Transmitter>> consumedDataTransmission = new HashMap<>();
 
     private int countPlusOne(Object object) {
         if (object == null) {
@@ -216,6 +231,56 @@ public class DataChannels {
             return removedDataImports;
         } finally {
             lock.writeLock().unlock();
+        }
+    }
+
+    public void combineDataTagWithDataExport(DataTag dataTag, DataExport dataExport) {
+        lock.writeLock().lock();
+        try {
+            List<DataExport> dataExports = generatedDataTransmission.computeIfAbsent(dataTag, (key) -> {
+                return new ArrayList<>();
+            });
+            dataExports.add(dataExport);
+        } finally {
+            lock.writeLock().unlock();
+        }
+    }
+
+    public List<DataExport> getGeneratedDataTrasmission(DataTag dataTag) {
+        lock.readLock().lock();
+        try {
+            return generatedDataTransmission.get(dataTag);
+        } finally {
+            lock.readLock().unlock();
+        }
+    }
+
+    public void stopGenerateData(DataTag dataTag) {
+        // TODO: 当前节点停止生成某一类数据
+    }
+
+    public void stopConsumeData(DataExport dataExport) {
+        // TODO: 某一条数据链路关闭，停止消费当前节点对应的数据
+    }
+
+    public void markConsumeData(DataImport dataImport, Transmitter transmitter) {
+        lock.writeLock().lock();
+        try {
+            List<Transmitter> transmitters = consumedDataTransmission.computeIfAbsent(dataImport.getId(), (key) -> {
+                return new ArrayList<>();
+            });
+            transmitters.add(transmitter);
+        } finally {
+            lock.writeLock().unlock();
+        }
+    }
+
+    public List<Transmitter> getTransmitters(String dataImportId) {
+        lock.readLock().lock();
+        try {
+            return consumedDataTransmission.get(dataImportId);
+        } finally {
+            lock.readLock().unlock();
         }
     }
 }

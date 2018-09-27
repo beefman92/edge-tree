@@ -12,6 +12,17 @@ public class RunJob implements Command {
     private String id;
     private ControlSignalType controlSignalType = ControlSignalType.RUN_JOB;
     private String jobName;
+    // demo code start
+    private boolean consumer;
+
+    public boolean isConsumer() {
+        return consumer;
+    }
+
+    public void setConsumer(boolean consumer) {
+        this.consumer = consumer;
+    }
+    // demo code end;
 
     @Override
     public String getId() {

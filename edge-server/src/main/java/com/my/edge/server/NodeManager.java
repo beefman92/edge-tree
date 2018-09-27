@@ -1,10 +1,9 @@
 package com.my.edge.server;
 
 import com.my.edge.common.control.command.RunJob;
+import com.my.edge.examples.DemoDataTag;
 import com.my.edge.server.config.Configuration;
 import com.my.edge.server.config.NetworkTopology;
-import com.my.edge.server.demo.DemoDataTag;
-import com.my.edge.server.demo.DataGenerator;
 import com.my.edge.common.network.NetworkManager;
 import com.my.edge.server.job.JobHandler;
 import org.apache.commons.lang3.StringUtils;
@@ -13,8 +12,6 @@ import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
 
 public class NodeManager {
     private final Logger logger = LoggerFactory.getLogger(this.getClass());
@@ -24,7 +21,6 @@ public class NodeManager {
     private ServerHandler serverHandler;
     private JobHandler jobHandler;
     private NetworkTopology networkTopology;
-    private DataGenerator dataGenerator;
     private boolean isDataGenerator;
     private boolean isTop;
 
@@ -38,7 +34,6 @@ public class NodeManager {
         serverHandler.setNetworkManager(networkManager);
         serverHandler.setNodeManager(this);
         jobHandler = new JobHandler(configuration);
-        dataGenerator = new DataGenerator(serverHandler, port);
         this.isDataGenerator = isGenerator;
         this.isTop = isTop;
     }
@@ -46,11 +41,14 @@ public class NodeManager {
     public void initialize() {
         networkTopology.initialize();
         networkManager.initialize();
+        // demo code start
         if (isDataGenerator) {
             serverHandler.addGenerateData(DemoDataTag.DEMO_DATA_TAG_1);
         }
+        // demo code end
         serverHandler.initialize();
         jobHandler.setServerHandler(this.serverHandler);
+        serverHandler.setJobHandler(jobHandler);
     }
 
     public void start() {
@@ -59,10 +57,6 @@ public class NodeManager {
             Thread networkManagerThread = new Thread(networkManager, "network-manager");
             networkManagerThread.start();
             serverHandler.start();
-            if (isDataGenerator) {
-                Thread dataGeneratorThread = new Thread(dataGenerator, "data-generator");
-                dataGeneratorThread.start();
-            }
             Thread jobHandlerThread = new Thread(jobHandler, "job-handler");
             jobHandlerThread.start();
         } catch (Exception e) {

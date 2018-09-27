@@ -3,6 +3,8 @@ package com.my.edge.common.network;
 import com.my.edge.common.control.ControlSignal;
 import com.my.edge.common.data.DataWrapper;
 import com.my.edge.common.entity.Tuple2;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.net.SocketAddress;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -13,6 +15,7 @@ import java.util.concurrent.BlockingQueue;
  * Date: 2018/9/14
  */
 public class MessagePool {
+    private Logger logger = LoggerFactory.getLogger(this.getClass());
     private BlockingQueue<Tuple2<SocketAddress, ControlSignal>> controlSignals = new ArrayBlockingQueue<>(1000);
     private BlockingQueue<Tuple2<SocketAddress, DataWrapper>> datum = new ArrayBlockingQueue<>(1000);
 
